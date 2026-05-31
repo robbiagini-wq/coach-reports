@@ -21,7 +21,7 @@
   input[type="text"],input[type="date"],input[type="url"],select,textarea{width:100%;background:var(--pine);border:1px solid var(--border);border-radius:8px;color:var(--chalk);font-family:'DM Sans',sans-serif;font-size:15px;padding:10px 12px;outline:none;transition:border-color 0.2s;-webkit-appearance:none;appearance:none;}
   select{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path fill='%23c8a47a' d='M2 4l4 4 4-4'/></svg>");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px;}
   input:focus,select:focus,textarea:focus{border-color:var(--accent);}
-  textarea{resize:none;min-height:90px;line-height:1.5;overflow:hidden;}
+  textarea{resize:none;min-height:46px;line-height:1.5;overflow:hidden;}
   .field{margin-bottom:14px;}
   .field:last-child{margin-bottom:0;}
   .row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
@@ -139,7 +139,7 @@
 
     <div class="card">
       <div class="card-title"><span class="icon">📝</span> Session Overview</div>
-      <div class="field"><textarea id="overview" placeholder="Brief summary of today's session..."></textarea></div>
+      <div class="field"><textarea id="overview" rows="3" placeholder="Brief summary of today's session..."></textarea></div>
     </div>
 
     <div class="card">
@@ -162,7 +162,7 @@
 
     <div class="card">
       <div class="card-title"><span class="icon">🏋️</span> Homework / Drills</div>
-      <div class="field"><textarea id="homework" placeholder="What should the player practice?"></textarea></div>
+      <div class="field"><textarea id="homework" rows="3" placeholder="What should the player practice?"></textarea></div>
     </div>
 
     <div class="card">
@@ -489,9 +489,10 @@ function exportReport(){
 function showToast(msg,isError){const t=document.getElementById('toast');t.textContent=msg;t.className='toast'+(isError?' error':'');t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3500);}
 
 // ───────── auto-grow textareas ─────────
-function autoGrow(el){if(!el)return;el.style.height='auto';el.style.height=(el.scrollHeight+2)+'px';}
-document.addEventListener('input',function(e){if(e.target.tagName==='TEXTAREA')autoGrow(e.target);});
-document.addEventListener('focusin',function(e){if(e.target.tagName==='TEXTAREA')autoGrow(e.target);});
+function autoGrow(el){if(!el||el.tagName!=='TEXTAREA')return;el.style.minHeight='0px';el.style.height='auto';el.style.height=(el.scrollHeight+4)+'px';}
+document.addEventListener('input',function(e){if(e.target.tagName==='TEXTAREA')autoGrow(e.target);},true);
+document.addEventListener('focusin',function(e){if(e.target.tagName==='TEXTAREA')autoGrow(e.target);},true);
+document.addEventListener('keyup',function(e){if(e.target.tagName==='TEXTAREA')autoGrow(e.target);},true);
 function growAll(){document.querySelectorAll('textarea').forEach(autoGrow);}
 
 // ───────── init ─────────
