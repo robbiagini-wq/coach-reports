@@ -36,6 +36,9 @@
   .thumb-wrap{position:relative;margin-top:10px;border-radius:8px;overflow:hidden;background:#000;}
   .thumb-wrap video{width:100%;display:block;max-height:240px;}
   .thumb-wrap img.thumb{width:100%;display:block;max-height:240px;object-fit:cover;}
+  .video-ready{width:100%;height:140px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:linear-gradient(135deg,#1a3a1a,#2d5a27);}
+  .video-ready .vr-icon{font-size:34px;}
+  .video-ready .vr-text{font-size:13px;letter-spacing:1px;text-transform:uppercase;color:var(--accent);font-weight:600;}
   .play-badge{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:54px;height:54px;background:rgba(0,0,0,0.55);border-radius:50%;display:flex;align-items:center;justify-content:center;pointer-events:none;}
   .play-badge:after{content:'';border-left:18px solid #fff;border-top:11px solid transparent;border-bottom:11px solid transparent;margin-left:4px;}
   .yt-embed{margin-top:10px;border-radius:8px;overflow:hidden;aspect-ratio:16/9;background:#000;}
@@ -170,20 +173,41 @@ function ytId(url){
   return m ? m[1] : null;
 }
 function makeVideoThumb(dataUrl){
+  // iPhone Safari requires the video to be in the DOM and briefly played
+  // before a frame can be drawn to canvas. We attach it off-screen, play
+  // muted inline for a moment, grab the frame, then clean up.
   return new Promise(res=>{
+    let done=false;
+    const finish=(val)=>{ if(done)return; done=true; try{cleanup();}catch(e){} res(val); };
     const v=document.createElement('video');
-    v.preload='metadata';v.muted=true;v.playsInline=true;v.src=dataUrl;
-    v.onloadeddata=()=>{ try{v.currentTime=0.1;}catch(e){} };
-    v.onseeked=()=>{
+    v.muted=true; v.defaultMuted=true; v.playsInline=true;
+    v.setAttribute('muted',''); v.setAttribute('playsinline','');
+    v.setAttribute('webkit-playsinline','');
+    v.preload='auto'; v.src=dataUrl;
+    // Off-screen but still "rendered" so Safari will decode frames
+    v.style.cssText='position:fixed;left:-9999px;top:0;width:160px;height:90px;opacity:0.01;pointer-events:none;';
+    document.body.appendChild(v);
+    function cleanup(){ try{v.pause();}catch(e){} if(v.parentNode)v.parentNode.removeChild(v); }
+    function capture(){
       try{
+        const w=v.videoWidth||320, h=v.videoHeight||240;
+        if(!w||!h){ return; }
         const c=document.createElement('canvas');
-        c.width=v.videoWidth||320;c.height=v.videoHeight||240;
-        c.getContext('2d').drawImage(v,0,0,c.width,c.height);
-        res(c.toDataURL('image/jpeg',0.6));
-      }catch(e){res(null);}
-    };
-    v.onerror=()=>res(null);
-    setTimeout(()=>res(null),4000);
+        c.width=w; c.height=h;
+        c.getContext('2d').drawImage(v,0,0,w,h);
+        const data=c.toDataURL('image/jpeg',0.6);
+        // a totally black frame is ~ very small / uniform; accept anyway but prefer a real one
+        finish(data);
+      }catch(e){ finish(null); }
+    }
+    v.addEventListener('loadeddata',()=>{ try{v.currentTime=0.1;}catch(e){} });
+    v.addEventListener('seeked',capture);
+    v.addEventListener('timeupdate',()=>{ if(v.currentTime>0) capture(); });
+    v.addEventListener('error',()=>finish(null));
+    // Kick Safari into decoding a frame by playing briefly
+    const p=v.play();
+    if(p&&p.then){ p.then(()=>{ setTimeout(()=>{ try{v.pause();}catch(e){} capture(); },250); }).catch(()=>{ /* fall back to seeked/timeupdate */ }); }
+    setTimeout(()=>finish(null),5000);
   });
 }
 
@@ -240,19 +264,24 @@ async function handleVideo(id,input){
   const reader=new FileReader();
   reader.onload=async e=>{
     const dataUrl=e.target.result;
+    mediaData[id]={kind:'video',dataUrl,thumb:null,name:file.name};
+    renderVideoPreview(id); // show immediately so the coach sees it loaded
     const thumb=await makeVideoThumb(dataUrl);
-    mediaData[id]={kind:'video',dataUrl,thumb,name:file.name};
-    renderVideoPreview(id);
+    if(mediaData[id]){ mediaData[id].thumb=thumb; renderVideoPreview(id); }
+    showToast(thumb?'Video added with preview':'Video added');
   };
   reader.readAsDataURL(file);
 }
 function renderVideoPreview(id){
   const d=mediaData[id];if(!d)return;
   const p=document.getElementById(id+'_preview');
-  const thumbImg=d.thumb?`<img class="thumb" src="${d.thumb}">`:`<video src="${d.dataUrl}" muted playsinline></video>`;
+  // If we have a real thumbnail use it; otherwise show a clear "Video loaded" tile
+  const tile = d.thumb
+    ? `<img class="thumb" src="${d.thumb}">`
+    : `<div class="video-ready"><span class="vr-icon">🎬</span><span class="vr-text">Video loaded</span></div>`;
   p.innerHTML=`
-    <div class="thumb-wrap" onclick="playInline('${id}')">${thumbImg}<div class="play-badge"></div></div>
-    <div class="file-name">${d.name||'Video clip'}</div>
+    <div class="thumb-wrap" onclick="playInline('${id}')">${tile}<div class="play-badge"></div></div>
+    <div class="file-name">✔ ${d.name||'Video clip'}</div>
     <div class="media-actions">
       <button class="mini-btn" onclick="document.getElementById('file_${id}').click()">Replace</button>
       <button class="mini-btn danger" onclick="clearVideo('${id}')">Remove</button>
@@ -445,484 +474,6 @@ function showToast(msg,isError){const t=document.getElementById('toast');t.textC
   try{await openDB();await renderDrafts();}catch(e){document.getElementById('draftsList').innerHTML='<div class="no-drafts">Saved sessions unavailable in this browser</div>';}
   addFinding();
 })();
-</script>
-</body>
-</html>
-
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Coach Report Builder</title>
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&display=swap" rel="stylesheet">
-<style>
-  :root {
-    --dirt: #c8a47a;
-    --grass: #2d5a27;
-    --chalk: #f5f0e8;
-    --night: #0f1a0f;
-    --pine: #1a3a1a;
-    --accent: #e8b84b;
-    --red: #c0392b;
-    --card: #1e2e1e;
-    --border: #2d4a2d;
-    --blue: #2e86c1;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'DM Sans', sans-serif; background: var(--night); color: var(--chalk); min-height: 100vh; padding-bottom: 40px; }
-
-  header { background: var(--pine); border-bottom: 3px solid var(--accent); padding: 18px 20px 14px; position: sticky; top: 0; z-index: 100; }
-  header h1 { font-family: 'Bebas Neue', sans-serif; font-size: 28px; letter-spacing: 2px; color: var(--accent); line-height: 1; }
-  header p { font-size: 11px; color: var(--dirt); letter-spacing: 1.5px; text-transform: uppercase; margin-top: 2px; }
-
-  main { padding: 20px 16px; max-width: 600px; margin: 0 auto; }
-
-  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 16px; }
-  .card-title { font-family: 'Bebas Neue', sans-serif; font-size: 16px; letter-spacing: 2px; color: var(--accent); text-transform: uppercase; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
-  .card-title .icon { width: 22px; height: 22px; background: var(--grass); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 12px; }
-
-  label { display: block; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--dirt); margin-bottom: 6px; }
-  input[type="text"], input[type="date"], select, textarea {
-    width: 100%; background: var(--pine); border: 1px solid var(--border); border-radius: 8px;
-    color: var(--chalk); font-family: 'DM Sans', sans-serif; font-size: 15px; padding: 10px 12px;
-    outline: none; transition: border-color 0.2s; -webkit-appearance: none; appearance: none;
-  }
-  input[type="text"]:focus, input[type="date"]:focus, select:focus, textarea:focus { border-color: var(--accent); }
-  textarea { resize: vertical; min-height: 80px; line-height: 1.5; }
-  .field { margin-bottom: 14px; }
-  .field:last-child { margin-bottom: 0; }
-  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-
-  .media-slots { display: flex; flex-direction: column; gap: 12px; }
-  .media-slot { background: var(--pine); border: 1.5px dashed var(--border); border-radius: 10px; padding: 14px; }
-  .media-slot.has-file { border-style: solid; border-color: var(--grass); }
-  .media-slot-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-  .slot-label { font-size: 12px; font-weight: 600; color: var(--dirt); }
-  .remove-btn { background: none; border: none; color: var(--red); font-size: 18px; cursor: pointer; padding: 0; line-height: 1; display: none; }
-  .media-slot.has-file .remove-btn { display: block; }
-  .upload-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: 8px; color: var(--chalk); font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500; padding: 10px; cursor: pointer; }
-  .file-preview { margin-top: 10px; display: none; }
-  .media-slot.has-file .file-preview { display: block; }
-  .file-preview video, .file-preview img { width: 100%; border-radius: 6px; max-height: 200px; object-fit: cover; }
-  .file-name { font-size: 12px; color: var(--dirt); margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .caption-field { margin-top: 10px; }
-  .caption-field input { font-size: 13px; padding: 8px 10px; }
-  .add-media-btn { width: 100%; background: none; border: 1.5px dashed var(--border); border-radius: 10px; color: var(--dirt); font-family: 'DM Sans', sans-serif; font-size: 14px; padding: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 12px; }
-
-  .findings-list { display: flex; flex-direction: column; gap: 10px; }
-  .finding-item { background: var(--pine); border-radius: 8px; padding: 12px; display: flex; gap: 10px; align-items: flex-start; }
-  .finding-item textarea { flex: 1; min-height: 70px; font-size: 14px; padding: 8px 10px; background: var(--card); }
-  .finding-remove { background: none; border: none; color: var(--red); font-size: 18px; cursor: pointer; padding: 0; flex-shrink: 0; line-height: 1; margin-top: 2px; }
-
-  /* ACTION BUTTONS */
-  .action-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
-  .save-btn { width: 100%; background: var(--blue); border: none; border-radius: 12px; color: white; font-family: 'Bebas Neue', sans-serif; font-size: 20px; letter-spacing: 2px; padding: 14px; cursor: pointer; }
-  .new-btn { width: 100%; background: var(--pine); border: 1px solid var(--border); border-radius: 12px; color: var(--chalk); font-family: 'Bebas Neue', sans-serif; font-size: 20px; letter-spacing: 2px; padding: 14px; cursor: pointer; }
-  .export-btn { width: 100%; background: var(--accent); border: none; border-radius: 12px; color: var(--night); font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 2px; padding: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; }
-  .export-note { text-align: center; font-size: 11px; color: var(--dirt); margin-top: 10px; line-height: 1.6; }
-
-  /* DRAFTS PANEL */
-  .drafts-panel { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 16px; }
-  .drafts-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
-  .draft-item { background: var(--pine); border-radius: 8px; padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border: 1px solid var(--border); }
-  .draft-item:hover { border-color: var(--accent); }
-  .draft-info { flex: 1; }
-  .draft-name { font-size: 15px; font-weight: 600; color: var(--chalk); }
-  .draft-meta { font-size: 11px; color: var(--dirt); margin-top: 2px; letter-spacing: 0.5px; }
-  .draft-actions { display: flex; gap: 8px; }
-  .draft-load { background: var(--accent); border: none; border-radius: 6px; color: var(--night); font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600; padding: 6px 12px; cursor: pointer; }
-  .draft-delete { background: none; border: 1px solid var(--red); border-radius: 6px; color: var(--red); font-family: 'DM Sans', sans-serif; font-size: 12px; padding: 6px 10px; cursor: pointer; }
-  .no-drafts { font-size: 13px; color: var(--dirt); font-style: italic; margin-top: 8px; }
-
-  input[type="file"] { display: none; }
-  .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--grass); color: var(--chalk); padding: 12px 24px; border-radius: 30px; font-size: 14px; font-weight: 500; transition: transform 0.3s ease; z-index: 999; white-space: nowrap; }
-  .toast.show { transform: translateX(-50%) translateY(0); }
-  .toast.error { background: var(--red); }
-</style>
-</head>
-<body>
-<header>
-  <h1>⚾ Coach Report Builder</h1>
-  <p>Mechanics feedback for parents</p>
-</header>
-<main>
-
-  <!-- SAVED DRAFTS -->
-  <div class="drafts-panel">
-    <div class="card-title" style="margin-bottom:0">📋 Saved Drafts</div>
-    <div class="drafts-list" id="draftsList"></div>
-  </div>
-
-  <!-- PLAYER INFO -->
-  <div class="card">
-    <div class="card-title"><span class="icon">👤</span> Player Info</div>
-    <div class="row">
-      <div class="field"><label>Player Name</label><input type="text" id="playerName" placeholder="First Last"></div>
-      <div class="field"><label>Date</label><input type="date" id="reportDate"></div>
-    </div>
-    <div class="row">
-      <div class="field"><label>Coach Name</label><input type="text" id="coachName" placeholder="Your name"></div>
-      <div class="field"><label>Focus Area</label>
-        <select id="focusArea">
-          <option value="Hitting">Hitting</option>
-          <option value="Pitching">Pitching</option>
-          <option value="Both">Both</option>
-        </select>
-      </div>
-    </div>
-  </div>
-
-  <!-- OVERVIEW -->
-  <div class="card">
-    <div class="card-title"><span class="icon">📝</span> Session Overview</div>
-    <div class="field"><textarea id="overview" placeholder="Brief summary of today's session..."></textarea></div>
-  </div>
-
-  <!-- VIDEOS -->
-  <div class="card">
-    <div class="card-title"><span class="icon">🎥</span> Videos</div>
-    <div class="media-slots" id="videoSlots"></div>
-    <button class="add-media-btn" onclick="addMediaSlot('video')">+ Add Video Clip</button>
-  </div>
-
-  <!-- STILL FRAMES -->
-  <div class="card">
-    <div class="card-title"><span class="icon">📸</span> Still Frames</div>
-    <div class="media-slots" id="imageSlots"></div>
-    <button class="add-media-btn" onclick="addMediaSlot('image')">+ Add Still Frame</button>
-  </div>
-
-  <!-- FINDINGS -->
-  <div class="card">
-    <div class="card-title"><span class="icon">🔍</span> Issues to Address</div>
-    <div class="findings-list" id="findingsList"></div>
-    <button class="add-media-btn" onclick="addFinding()" style="margin-top:10px">+ Add Issue</button>
-  </div>
-
-  <!-- HOMEWORK -->
-  <div class="card">
-    <div class="card-title"><span class="icon">🏋️</span> Homework / Drills</div>
-    <div class="field"><textarea id="homework" placeholder="What should the player practice?"></textarea></div>
-  </div>
-
-  <!-- NEXT SESSION -->
-  <div class="card">
-    <div class="card-title"><span class="icon">📅</span> Next Session</div>
-    <div class="row">
-      <div class="field"><label>Next Date</label><input type="date" id="nextDate"></div>
-      <div class="field"><label>Focus Next Time</label><input type="text" id="nextFocus" placeholder="e.g. Hip rotation"></div>
-    </div>
-  </div>
-
-  <!-- ACTIONS -->
-  <div class="action-row">
-    <button class="save-btn" onclick="saveDraft()">💾 Save Draft</button>
-    <button class="new-btn" onclick="newSession()">＋ New Session</button>
-  </div>
-  <button class="export-btn" onclick="exportReport()">⬇ Export Report</button>
-  <p class="export-note">Export → Upload to Google Drive → Share link with parent</p>
-
-</main>
-<div class="toast" id="toast"></div>
-
-<script>
-document.getElementById('reportDate').valueAsDate = new Date();
-
-let videoCount = 0, imageCount = 0, findingCount = 0;
-const mediaData = {};
-
-// ── DRAFTS ──
-function getDraftKey(name, focus) {
-  return 'draft_' + name.trim().toLowerCase().replace(/\s+/g, '_') + '_' + focus.toLowerCase();
-}
-
-function saveDraft() {
-  const name = document.getElementById('playerName').value.trim();
-  if (!name) { showToast('Enter a player name first', true); return; }
-  const focus = document.getElementById('focusArea').value;
-
-  const findings = [];
-  document.querySelectorAll('.finding-item').forEach(item => {
-    const note = item.querySelector('textarea')?.value.trim();
-    if (note) findings.push(note);
-  });
-
-  // Save text data only (media stored separately due to size)
-  const draft = {
-    playerName: name,
-    coachName: document.getElementById('coachName').value,
-    reportDate: document.getElementById('reportDate').value,
-    focusArea: focus,
-    overview: document.getElementById('overview').value,
-    homework: document.getElementById('homework').value,
-    nextDate: document.getElementById('nextDate').value,
-    nextFocus: document.getElementById('nextFocus').value,
-    findings,
-    savedAt: new Date().toISOString(),
-    mediaNote: Object.keys(mediaData).length > 0 ? Object.keys(mediaData).length + ' media file(s) — reload manually' : ''
-  };
-
-  try {
-    localStorage.setItem(getDraftKey(name, focus), JSON.stringify(draft));
-    renderDrafts();
-    showToast('Draft saved for ' + name + ' (' + focus + ')!');
-  } catch(e) {
-    showToast('Storage full — try removing old drafts', true);
-  }
-}
-
-function loadDraft(key) {
-  const raw = localStorage.getItem(key);
-  if (!raw) return;
-  const d = JSON.parse(raw);
-
-  document.getElementById('playerName').value = d.playerName || '';
-  document.getElementById('coachName').value = d.coachName || '';
-  document.getElementById('reportDate').value = d.reportDate || '';
-  document.getElementById('focusArea').value = d.focusArea || 'Hitting';
-  document.getElementById('overview').value = d.overview || '';
-  document.getElementById('homework').value = d.homework || '';
-  document.getElementById('nextDate').value = d.nextDate || '';
-  document.getElementById('nextFocus').value = d.nextFocus || '';
-
-  // Clear and reload findings
-  document.getElementById('findingsList').innerHTML = '';
-  findingCount = 0;
-  if (d.findings && d.findings.length) {
-    d.findings.forEach(note => { addFinding(note); });
-  } else {
-    addFinding();
-  }
-
-  showToast('Loaded draft for ' + d.playerName + '!');
-  if (d.mediaNote) setTimeout(() => showToast('Note: ' + d.mediaNote), 2000);
-
-  // Scroll to top
-  window.scrollTo(0, 0);
-}
-
-function deleteDraft(key) {
-  if (confirm('Delete this draft?')) {
-    localStorage.removeItem(key);
-    renderDrafts();
-    showToast('Draft deleted');
-  }
-}
-
-function renderDrafts() {
-  const list = document.getElementById('draftsList');
-  const keys = Object.keys(localStorage).filter(k => k.startsWith('draft_'));
-
-  if (keys.length === 0) {
-    list.innerHTML = '<div class="no-drafts">No saved drafts yet</div>';
-    return;
-  }
-
-  list.innerHTML = '';
-  keys.sort().forEach(key => {
-    try {
-      const d = JSON.parse(localStorage.getItem(key));
-      const savedDate = new Date(d.savedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-      const item = document.createElement('div');
-      item.className = 'draft-item';
-      item.innerHTML = `
-        <div class="draft-info">
-          <div class="draft-name">${d.playerName}</div>
-          <div class="draft-meta">${d.focusArea} · Saved ${savedDate}${d.mediaNote ? ' · ⚠️ Re-add media' : ''}</div>
-        </div>
-        <div class="draft-actions">
-          <button class="draft-load" onclick="loadDraft('${key}')">Load</button>
-          <button class="draft-delete" onclick="deleteDraft('${key}')">✕</button>
-        </div>
-      `;
-      list.appendChild(item);
-    } catch(e) {}
-  });
-}
-
-function newSession() {
-  if (!confirm('Start a new session? Unsaved changes will be lost.')) return;
-  document.getElementById('playerName').value = '';
-  document.getElementById('coachName').value = document.getElementById('coachName').value; // keep coach name
-  document.getElementById('reportDate').valueAsDate = new Date();
-  document.getElementById('focusArea').value = 'Hitting';
-  document.getElementById('overview').value = '';
-  document.getElementById('homework').value = '';
-  document.getElementById('nextDate').value = '';
-  document.getElementById('nextFocus').value = '';
-  document.getElementById('videoSlots').innerHTML = '';
-  document.getElementById('imageSlots').innerHTML = '';
-  document.getElementById('findingsList').innerHTML = '';
-  Object.keys(mediaData).forEach(k => delete mediaData[k]);
-  videoCount = 0; imageCount = 0; findingCount = 0;
-  addFinding();
-  window.scrollTo(0, 0);
-  showToast('New session started');
-}
-
-// ── MEDIA ──
-function addMediaSlot(type) {
-  const container = document.getElementById(type === 'video' ? 'videoSlots' : 'imageSlots');
-  const id = type + '_' + (type === 'video' ? ++videoCount : ++imageCount);
-  const label = type === 'video' ? `Clip ${videoCount}` : `Frame ${imageCount}`;
-  const accept = type === 'video' ? 'video/*' : 'image/*';
-  const inputId = 'file_' + id;
-  const slot = document.createElement('div');
-  slot.className = 'media-slot';
-  slot.id = 'slot_' + id;
-  slot.innerHTML = `
-    <input type="file" id="${inputId}" accept="${accept}" onchange="handleFile('${id}','${type}',this)">
-    <div class="media-slot-header">
-      <span class="slot-label">${label}</span>
-      <button class="remove-btn" onclick="removeSlot('${id}')">✕</button>
-    </div>
-    <button class="upload-btn" onclick="document.getElementById('${inputId}').click()">
-      ${type === 'video' ? '🎥' : '📸'} Choose ${type === 'video' ? 'Video' : 'Image'} from iPhone
-    </button>
-    <div class="file-preview" id="preview_${id}"></div>
-    <div class="caption-field"><input type="text" id="caption_${id}" placeholder="Caption..."></div>
-  `;
-  container.appendChild(slot);
-}
-
-function handleFile(id, type, input) {
-  const file = input.files[0];
-  if (!file) return;
-  const slot = document.getElementById('slot_' + id);
-  const preview = document.getElementById('preview_' + id);
-  slot.classList.add('has-file');
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    mediaData[id] = { type, dataUrl: e.target.result, name: file.name };
-    if (type === 'video') {
-      preview.innerHTML = `<video src="${e.target.result}" controls playsinline></video><div class="file-name">${file.name}</div>`;
-    } else {
-      preview.innerHTML = `<img src="${e.target.result}" alt="frame"><div class="file-name">${file.name}</div>`;
-    }
-  };
-  reader.readAsDataURL(file);
-}
-
-function removeSlot(id) {
-  document.getElementById('slot_' + id)?.remove();
-  delete mediaData[id];
-}
-
-// ── FINDINGS ──
-function addFinding(prefill) {
-  const list = document.getElementById('findingsList');
-  const id = 'finding_' + (++findingCount);
-  const item = document.createElement('div');
-  item.className = 'finding-item';
-  item.id = id;
-  item.innerHTML = `
-    <textarea id="${id}_note" placeholder="Describe the issue and what to work on...">${prefill || ''}</textarea>
-    <button class="finding-remove" onclick="document.getElementById('${id}').remove()">✕</button>
-  `;
-  list.appendChild(item);
-}
-
-// ── EXPORT ──
-function exportReport() {
-  const player = document.getElementById('playerName').value.trim() || 'Player';
-  const coach = document.getElementById('coachName').value.trim();
-  const date = document.getElementById('reportDate').value;
-  const focus = document.getElementById('focusArea').value;
-  const overview = document.getElementById('overview').value.trim();
-  const homework = document.getElementById('homework').value.trim();
-  const nextDate = document.getElementById('nextDate').value;
-  const nextFocus = document.getElementById('nextFocus').value.trim();
-
-  const findings = [];
-  document.querySelectorAll('.finding-item').forEach(item => {
-    const note = item.querySelector('textarea')?.value.trim();
-    if (note) findings.push(note);
-  });
-
-  const videos = [], images = [];
-  Object.entries(mediaData).forEach(([id, data]) => {
-    const caption = document.getElementById('caption_' + id)?.value.trim() || '';
-    if (data.type === 'video') videos.push({ dataUrl: data.dataUrl, caption });
-    else images.push({ dataUrl: data.dataUrl, caption });
-  });
-
-  const fmt = (d) => d ? new Date(d + 'T12:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
-
-  const findingsHTML = findings.map((f, i) => `
-    <div style="background:#1a2e1a;border-left:3px solid #e8b84b;border-radius:0 8px 8px 0;padding:12px 14px;margin-bottom:10px">
-      <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#e8b84b;font-weight:600;margin-bottom:4px">Issue ${i+1}</div>
-      <div style="font-size:15px;line-height:1.6;color:#f5f0e8">${f}</div>
-    </div>`).join('');
-
-  const videosHTML = videos.map(v => `
-    <div style="margin-bottom:16px">
-      <video src="${v.dataUrl}" controls playsinline style="width:100%;border-radius:10px;max-height:300px;background:#000"></video>
-      ${v.caption ? `<div style="font-size:13px;color:#c8a47a;margin-top:6px">▶ ${v.caption}</div>` : ''}
-    </div>`).join('');
-
-  const imagesHTML = images.map(i => `
-    <div style="margin-bottom:16px">
-      <img src="${i.dataUrl}" style="width:100%;border-radius:10px;max-height:300px;object-fit:cover" alt="frame">
-      ${i.caption ? `<div style="font-size:13px;color:#c8a47a;margin-top:6px">📸 ${i.caption}</div>` : ''}
-    </div>`).join('');
-
-  const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>${player} — Coaching Report</title>
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
-<style>
-body{font-family:'DM Sans',sans-serif;background:#0f1a0f;color:#f5f0e8;margin:0;padding:0}
-.hero{background:#1a3a1a;border-bottom:3px solid #e8b84b;padding:28px 20px 20px}
-.hero h1{font-family:'Bebas Neue',sans-serif;font-size:36px;letter-spacing:2px;color:#e8b84b;margin:0 0 4px}
-.meta{font-size:12px;color:#c8a47a;letter-spacing:1px;text-transform:uppercase}
-.badge{display:inline-block;background:#2d5a27;color:#e8b84b;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;padding:3px 10px;border-radius:20px;margin-top:8px}
-.content{padding:20px 16px;max-width:600px;margin:0 auto}
-.section{margin-bottom:28px}
-.section-title{font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:2px;color:#e8b84b;text-transform:uppercase;border-bottom:1px solid #2d4a2d;padding-bottom:6px;margin-bottom:14px}
-.text-block{font-size:15px;line-height:1.7;color:#f5f0e8;background:#1e2e1e;border-radius:10px;padding:14px}
-.next-box{background:#1e2e1e;border:1px solid #2d4a2d;border-radius:10px;padding:14px;display:flex;gap:20px;flex-wrap:wrap}
-.next-item label{font-size:11px;color:#c8a47a;letter-spacing:1px;text-transform:uppercase;display:block;margin-bottom:3px}
-.next-item span{font-size:15px;font-weight:500}
-footer{text-align:center;font-size:11px;color:#2d4a2d;padding:30px 20px;letter-spacing:1px}
-</style></head><body>
-<div class="hero">
-  <div class="meta">⚾ Coaching Report</div>
-  <h1>${player}</h1>
-  <div class="meta">${fmt(date)}</div>
-  <div class="badge">${focus}</div>
-</div>
-<div class="content">
-  ${overview ? `<div class="section"><div class="section-title">Session Overview</div><div class="text-block">${overview.replace(/\n/g,'<br>')}</div></div>` : ''}
-  ${findingsHTML ? `<div class="section"><div class="section-title">Issues to Address</div>${findingsHTML}</div>` : ''}
-  ${videosHTML ? `<div class="section"><div class="section-title">Video Clips</div>${videosHTML}</div>` : ''}
-  ${imagesHTML ? `<div class="section"><div class="section-title">Still Frames</div>${imagesHTML}</div>` : ''}
-  ${homework ? `<div class="section"><div class="section-title">Homework & Drills</div><div class="text-block">${homework.replace(/\n/g,'<br>')}</div></div>` : ''}
-  ${(fmt(nextDate)||nextFocus) ? `<div class="section"><div class="section-title">Next Session</div><div class="next-box">${fmt(nextDate)?`<div class="next-item"><label>Date</label><span>${fmt(nextDate)}</span></div>`:''}${nextFocus?`<div class="next-item"><label>Focus</label><span>${nextFocus}</span></div>`:''}</div></div>` : ''}
-</div>
-<footer>COACH${coach?': '+coach.toUpperCase():''} · ${fmt(date)}</footer>
-</body></html>`;
-
-  const blob = new Blob([html], { type: 'text/html' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${player.replace(/\s+/g,'-').toLowerCase()}-coaching-report-${date||'report'}.html`;
-  a.click();
-  URL.revokeObjectURL(url);
-  showToast('Report exported!');
-}
-
-function showToast(msg, isError) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = 'toast' + (isError ? ' error' : '');
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 3500);
-}
-
-// Init
-renderDrafts();
-addFinding();
 </script>
 </body>
 </html>
