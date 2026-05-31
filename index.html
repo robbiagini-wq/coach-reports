@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -453,9 +454,29 @@ function exportReport(){
   const {videos,images}=collectMedia();
   const fmt=d=>d?new Date(d+'T12:00:00').toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}):'';
   const findingsHTML=findings.map((f,i)=>`<div style="background:#1a2e1a;border-left:3px solid #e8b84b;border-radius:0 8px 8px 0;padding:12px 14px;margin-bottom:10px"><div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#e8b84b;font-weight:600;margin-bottom:4px">Issue ${i+1}</div><div style="font-size:15px;line-height:1.6;color:#f5f0e8">${f}</div></div>`).join('');
-  const videosHTML=videos.map(v=>{
-    if(v.kind==='youtube')return `<div style="margin-bottom:16px"><div style="position:relative;padding-bottom:56.25%;border-radius:10px;overflow:hidden;background:#000"><iframe src="https://www.youtube.com/embed/${v.youtubeId}" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allowfullscreen></iframe></div>${v.caption?`<div style="font-size:13px;color:#c8a47a;margin-top:6px">▶ ${v.caption}</div>`:''}</div>`;
-    return `<div style="margin-bottom:16px"><video src="${v.dataUrl}"${v.thumb?` poster="${v.thumb}"`:''} controls playsinline preload="metadata" style="width:100%;border-radius:10px;max-height:320px;background:#000"></video>${v.caption?`<div style="font-size:13px;color:#c8a47a;margin-top:6px">▶ ${v.caption}</div>`:''}</div>`;
+  const videosHTML=videos.map((v,vi)=>{
+    if(v.kind==='youtube'){
+      const ytWrapId='yt_'+vi;
+      return `<div style="margin-bottom:16px">
+        <div id="${ytWrapId}" style="position:relative;border-radius:10px;overflow:hidden;background:#000;cursor:pointer;aspect-ratio:16/9" onclick="(function(){var w=document.getElementById('${ytWrapId}');w.innerHTML='<iframe src=\\'https://www.youtube.com/embed/${v.youtubeId}?autoplay=1\\' style=\\'position:absolute;top:0;left:0;width:100%;height:100%;border:0\\' allowfullscreen></iframe>';})()">
+          <img src="https://img.youtube.com/vi/${v.youtubeId}/hqdefault.jpg" style="width:100%;height:100%;object-fit:cover;display:block">
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:64px;height:46px;background:rgba(255,0,0,0.85);border-radius:12px;display:flex;align-items:center;justify-content:center"><div style="border-left:20px solid #fff;border-top:12px solid transparent;border-bottom:12px solid transparent;margin-left:5px"></div></div>
+        </div>
+        ${v.caption?`<div style="font-size:13px;color:#c8a47a;margin-top:6px">▶ ${v.caption}</div>`:''}
+      </div>`;
+    }
+    const vidId='vid_'+vi;
+    if(v.thumb){
+      // Show thumbnail image with play overlay; tap reveals & plays the video.
+      return `<div style="margin-bottom:16px">
+        <div id="wrap_${vidId}" style="position:relative;border-radius:10px;overflow:hidden;background:#000;cursor:pointer" onclick="(function(){var w=document.getElementById('wrap_${vidId}');w.innerHTML='<video src=\\'${v.dataUrl}\\' controls autoplay playsinline style=\\'width:100%;border-radius:10px;max-height:320px;background:#000\\'></video>';})()">
+          <img src="${v.thumb}" style="width:100%;display:block;max-height:320px;object-fit:cover">
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:60px;height:60px;background:rgba(0,0,0,0.55);border-radius:50%;display:flex;align-items:center;justify-content:center"><div style="border-left:20px solid #fff;border-top:12px solid transparent;border-bottom:12px solid transparent;margin-left:5px"></div></div>
+        </div>
+        ${v.caption?`<div style="font-size:13px;color:#c8a47a;margin-top:6px">▶ ${v.caption}</div>`:''}
+      </div>`;
+    }
+    return `<div style="margin-bottom:16px"><video src="${v.dataUrl}" controls playsinline preload="metadata" style="width:100%;border-radius:10px;max-height:320px;background:#000"></video>${v.caption?`<div style="font-size:13px;color:#c8a47a;margin-top:6px">▶ ${v.caption}</div>`:''}</div>`;
   }).join('');
   const imagesHTML=images.map(i=>`<div style="margin-bottom:16px"><img src="${i.dataUrl}" style="width:100%;border-radius:10px;max-height:320px;object-fit:cover"><div></div>${i.caption?`<div style="font-size:13px;color:#c8a47a;margin-top:6px">📸 ${i.caption}</div>`:''}</div>`).join('');
   const html=`<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>${player} — Coaching Report</title><link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"><style>body{font-family:'DM Sans',sans-serif;background:#0f1a0f;color:#f5f0e8;margin:0;padding:0}.hero{background:#1a3a1a;border-bottom:3px solid #e8b84b;padding:28px 20px 20px}.hero h1{font-family:'Bebas Neue',sans-serif;font-size:36px;letter-spacing:2px;color:#e8b84b;margin:0 0 4px}.meta{font-size:12px;color:#c8a47a;letter-spacing:1px;text-transform:uppercase}.badge{display:inline-block;background:#2d5a27;color:#e8b84b;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;padding:3px 10px;border-radius:20px;margin-top:8px}.content{padding:20px 16px;max-width:600px;margin:0 auto}.section{margin-bottom:28px}.section-title{font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:2px;color:#e8b84b;text-transform:uppercase;border-bottom:1px solid #2d4a2d;padding-bottom:6px;margin-bottom:14px}.text-block{font-size:15px;line-height:1.7;background:#1e2e1e;border-radius:10px;padding:14px}.next-box{background:#1e2e1e;border:1px solid #2d4a2d;border-radius:10px;padding:14px;display:flex;gap:20px;flex-wrap:wrap}.next-item label{font-size:11px;color:#c8a47a;letter-spacing:1px;text-transform:uppercase;display:block;margin-bottom:3px}.next-item span{font-size:15px;font-weight:500}footer{text-align:center;font-size:11px;color:#2d4a2d;padding:30px 20px;letter-spacing:1px}</style></head><body><div class="hero"><div class="meta">⚾ Coaching Report</div><h1>${player}</h1><div class="meta">${fmt(date)}</div><div class="badge">${focus}</div></div><div class="content">${overview?`<div class="section"><div class="section-title">Session Overview</div><div class="text-block">${overview.replace(/\n/g,'<br>')}</div></div>`:''}${findingsHTML?`<div class="section"><div class="section-title">Issues to Address</div>${findingsHTML}</div>`:''}${videosHTML?`<div class="section"><div class="section-title">Video Clips</div>${videosHTML}</div>`:''}${imagesHTML?`<div class="section"><div class="section-title">Still Frames</div>${imagesHTML}</div>`:''}${homework?`<div class="section"><div class="section-title">Homework & Drills</div><div class="text-block">${homework.replace(/\n/g,'<br>')}</div></div>`:''}${(fmt(nextDate)||nextFocus)?`<div class="section"><div class="section-title">Next Session</div><div class="next-box">${fmt(nextDate)?`<div class="next-item"><label>Date</label><span>${fmt(nextDate)}</span></div>`:''}${nextFocus?`<div class="next-item"><label>Focus</label><span>${nextFocus}</span></div>`:''}</div></div>`:''}</div><footer>COACH${coach?': '+coach.toUpperCase():''} · ${fmt(date)}</footer></body></html>`;
