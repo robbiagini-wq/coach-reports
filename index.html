@@ -481,6 +481,7 @@ function exportReport(){
   a.download=`${player.replace(/\s+/g,'-').toLowerCase()}-coaching-report-${date||'report'}.html`;
   a.click();URL.revokeObjectURL(url);
   showToast('Report exported!');
+  showPlayers();
 }
 
 function showToast(msg,isError){const t=document.getElementById('toast');t.textContent=msg;t.className='toast'+(isError?' error':'');t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3500);}
