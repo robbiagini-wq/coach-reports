@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Coach Report Builder</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --dirt: #c8a47a;
+    --clay: #a0522d;
+    --grass: #2d5a27;
+    --chalk: #f5f0e8;
+    --night: #0f1a0f;
+    --pine: #1a3a1a;
+    --accent: #e8b84b;
+    --red: #c0392b;
+    --card: #1e2e1e;
+    --border: #2d4a2d;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--night);
+    color: var(--chalk);
+    min-height: 100vh;
+    padding-bottom: 40px;
+  }
+
+  header {
+    background: var(--pine);
+    border-bottom: 3px solid var(--accent);
+    padding: 18px 20px 14px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  header h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px;
+    letter-spacing: 2px;
+    color: var(--accent);
+    line-height: 1;
+  }
+
+  header p {
+    font-size: 11px;
+    color: var(--dirt);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+
+  main {
+    padding: 20px 16px;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+    margin-bottom: 16px;
+  }
+
+  .card-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 16px;
+    letter-spacing: 2px;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .card-title .icon {
+    width: 22px;
+    height: 22px;
+    background: var(--grass);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+  }
+
+  label {
+    display: block;
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--dirt);
+    margin-bottom: 6px;
+  }
+
+  input[type="text"],
+  input[type="date"],
+  select,
+  textarea {
+    width: 100%;
+    background: var(--pine);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--chalk);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    padding: 10px 12px;
+    outline: none;
+    transition: border-color 0.2s;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  input[type="text"]:focus,
+  input[type="date"]:focus,
+  select:focus,
+  textarea:focus {
+    border-color: var(--accent);
+  }
+
+  textarea {
+    resize: vertical;
+    min-height: 80px;
+    line-height: 1.5;
+  }
+
+  .field { margin-bottom: 14px; }
+  .field:last-child { margin-bottom: 0; }
+
+  .row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .media-slots {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .media-slot {
+    background: var(--pine);
+    border: 1.5px dashed var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    transition: border-color 0.2s;
+  }
+
+  .media-slot.has-file {
+    border-style: solid;
+    border-color: var(--grass);
+  }
+
+  .media-slot-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+
+  .slot-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--dirt);
+    letter-spacing: 0.5px;
+  }
+
+  .remove-btn {
+    background: none;
+    border: none;
+    color: var(--red);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    display: none;
+  }
+
+  .media-slot.has-file .remove-btn { display: block; }
+
+  .upload-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--chalk);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    padding: 10px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .upload-btn:active { background: var(--border); }
+
+  .file-preview { margin-top: 10px; display: none; }
+  .media-slot.has-file .file-preview { display: block; }
+
+  .file-preview video,
+  .file-preview img {
+    width: 100%;
+    border-radius: 6px;
+    max-height: 200px;
+    object-fit: cover;
+  }
+
+  .file-name {
+    font-size: 12px;
+    color: var(--dirt);
+    margin-top: 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .caption-field { margin-top: 10px; }
+  .caption-field input { font-size: 13px; padding: 8px 10px; }
+
+  .add-media-btn {
+    width: 100%;
+    background: none;
+    border: 1.5px dashed var(--border);
+    border-radius: 10px;
+    color: var(--dirt);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    padding: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: border-color 0.2s, color 0.2s;
+    margin-top: 12px;
+  }
+
+  .add-media-btn:active { border-color: var(--accent); color: var(--accent); }
+
+  .findings-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .finding-item {
+    background: var(--pine);
+    border-radius: 8px;
+    padding: 12px;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  .finding-item textarea {
+    flex: 1;
+    min-height: 70px;
+    font-size: 14px;
+    padding: 8px 10px;
+    background: var(--card);
+  }
+
+  .finding-remove {
+    background: none;
+    border: none;
+    color: var(--red);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 0;
+    flex-shrink: 0;
+    line-height: 1;
+    margin-top: 2px;
+  }
+
+  .export-section { margin-top: 8px; }
+
+  .export-btn {
+    width: 100%;
+    background: var(--accent);
+    border: none;
+    border-radius: 12px;
+    color: var(--night);
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    letter-spacing: 2px;
+    padding: 16px;
+    cursor: pointer;
+    transition: opacity 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+
+  .export-btn:active { opacity: 0.85; }
+
+  .export-note {
+    text-align: center;
+    font-size: 11px;
+    color: var(--dirt);
+    margin-top: 10px;
+    line-height: 1.6;
+    letter-spacing: 0.3px;
+  }
+
+  input[type="file"] { display: none; }
+
+  .toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--grass);
+    color: var(--chalk);
+    padding: 12px 24px;
+    border-radius: 30px;
+    font-size: 14px;
+    font-weight: 500;
+    transition: transform 0.3s ease;
+    z-index: 999;
+    white-space: nowrap;
+  }
+
+  .toast.show { transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⚾ Coach Report Builder</h1>
+  <p>Mechanics feedback for parents</p>
+</header>
+
+<main>
+
+  <!-- PLAYER & COACH INFO -->
+  <div class="card">
+    <div class="card-title"><span class="icon">👤</span> Player Info</div>
+    <div class="row">
+      <div class="field">
+        <label>Player Name</label>
+        <input type="text" id="playerName" placeholder="First Last">
+      </div>
+      <div class="field">
+        <label>Date</label>
+        <input type="date" id="reportDate">
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>Coach Name</label>
+        <input type="text" id="coachName" placeholder="Your name">
+      </div>
+      <div class="field">
+        <label>Focus Area</label>
+        <select id="focusArea">
+          <option value="Hitting">Hitting</option>
+          <option value="Pitching">Pitching</option>
+          <option value="Both">Both</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- OVERVIEW -->
+  <div class="card">
+    <div class="card-title"><span class="icon">📝</span> Session Overview</div>
+    <div class="field">
+      <textarea id="overview" placeholder="Brief summary of today's session and what you worked on..."></textarea>
+    </div>
+  </div>
+
+  <!-- VIDEOS -->
+  <div class="card">
+    <div class="card-title"><span class="icon">🎥</span> Videos</div>
+    <div class="media-slots" id="videoSlots"></div>
+    <button class="add-media-btn" onclick="addMediaSlot('video')">+ Add Video Clip</button>
+  </div>
+
+  <!-- STILL FRAMES -->
+  <div class="card">
+    <div class="card-title"><span class="icon">📸</span> Still Frames</div>
+    <div class="media-slots" id="imageSlots"></div>
+    <button class="add-media-btn" onclick="addMediaSlot('image')">+ Add Still Frame</button>
+  </div>
+
+  <!-- FINDINGS -->
+  <div class="card">
+    <div class="card-title"><span class="icon">🔍</span> Issues to Address</div>
+    <div class="findings-list" id="findingsList"></div>
+    <button class="add-media-btn" onclick="addFinding()" style="margin-top:10px">+ Add Issue</button>
+  </div>
+
+  <!-- HOMEWORK -->
+  <div class="card">
+    <div class="card-title"><span class="icon">🏋️</span> Homework / Drills</div>
+    <div class="field">
+      <textarea id="homework" placeholder="What should the player practice before next session?"></textarea>
+    </div>
+  </div>
+
+  <!-- NEXT SESSION -->
+  <div class="card">
+    <div class="card-title"><span class="icon">📅</span> Next Session</div>
+    <div class="row">
+      <div class="field">
+        <label>Next Date</label>
+        <input type="date" id="nextDate">
+      </div>
+      <div class="field">
+        <label>Focus Next Time</label>
+        <input type="text" id="nextFocus" placeholder="e.g. Hip rotation">
+      </div>
+    </div>
+  </div>
+
+  <!-- EXPORT -->
+  <div class="export-section">
+    <button class="export-btn" onclick="exportReport()">⬇ Export Report</button>
+    <p class="export-note">Downloads an HTML file · Upload to Google Drive<br>Set sharing to "Anyone with link" · Send link to parent</p>
+  </div>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+document.getElementById('reportDate').valueAsDate = new Date();
+
+let videoCount = 0;
+let imageCount = 0;
+const mediaData = {};
+
+function addMediaSlot(type) {
+  const container = document.getElementById(type === 'video' ? 'videoSlots' : 'imageSlots');
+  const id = type + '_' + (type === 'video' ? ++videoCount : ++imageCount);
+  const label = type === 'video' ? `Clip ${videoCount}` : `Frame ${imageCount}`;
+  const accept = type === 'video' ? 'video/*' : 'image/*';
+  const inputId = 'file_' + id;
+
+  const slot = document.createElement('div');
+  slot.className = 'media-slot';
+  slot.id = 'slot_' + id;
+
+  slot.innerHTML = `
+    <input type="file" id="${inputId}" accept="${accept}" onchange="handleFile('${id}', '${type}', this)">
+    <div class="media-slot-header">
+      <span class="slot-label">${label}</span>
+      <button class="remove-btn" onclick="removeSlot('${id}')">✕</button>
+    </div>
+    <button class="upload-btn" onclick="document.getElementById('${inputId}').click()">
+      ${type === 'video' ? '🎥' : '📸'} Choose ${type === 'video' ? 'Video' : 'Image'} from iPhone
+    </button>
+    <div class="file-preview" id="preview_${id}"></div>
+    <div class="caption-field">
+      <input type="text" id="caption_${id}" placeholder="Caption for this ${type === 'video' ? 'clip' : 'frame'}...">
+    </div>
+  `;
+  container.appendChild(slot);
+}
+
+function handleFile(id, type, input) {
+  const file = input.files[0];
+  if (!file) return;
+  const slot = document.getElementById('slot_' + id);
+  const preview = document.getElementById('preview_' + id);
+  slot.classList.add('has-file');
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    mediaData[id] = { type, dataUrl: e.target.result, name: file.name };
+    if (type === 'video') {
+      preview.innerHTML = `<video src="${e.target.result}" controls playsinline></video><div class="file-name">${file.name}</div>`;
+    } else {
+      preview.innerHTML = `<img src="${e.target.result}" alt="frame"><div class="file-name">${file.name}</div>`;
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeSlot(id) {
+  const slot = document.getElementById('slot_' + id);
+  if (slot) slot.remove();
+  delete mediaData[id];
+}
+
+let findingCount = 0;
+
+function addFinding() {
+  const list = document.getElementById('findingsList');
+  const id = 'finding_' + (++findingCount);
+
+  const item = document.createElement('div');
+  item.className = 'finding-item';
+  item.id = id;
+  item.innerHTML = `
+    <textarea id="${id}_note" placeholder="Describe the issue and what to work on..."></textarea>
+    <button class="finding-remove" onclick="document.getElementById('${id}').remove()">✕</button>
+  `;
+  list.appendChild(item);
+}
+
+addFinding();
+
+function exportReport() {
+  const player = document.getElementById('playerName').value.trim() || 'Player';
+  const coach = document.getElementById('coachName').value.trim();
+  const date = document.getElementById('reportDate').value;
+  const focus = document.getElementById('focusArea').value;
+  const overview = document.getElementById('overview').value.trim();
+  const homework = document.getElementById('homework').value.trim();
+  const nextDate = document.getElementById('nextDate').value;
+  const nextFocus = document.getElementById('nextFocus').value.trim();
+
+  const findings = [];
+  document.querySelectorAll('.finding-item').forEach(item => {
+    const note = item.querySelector('textarea')?.value.trim();
+    if (note) findings.push(note);
+  });
+
+  const videos = [];
+  const images = [];
+  Object.entries(mediaData).forEach(([id, data]) => {
+    const caption = document.getElementById('caption_' + id)?.value.trim() || '';
+    if (data.type === 'video') videos.push({ dataUrl: data.dataUrl, caption });
+    else images.push({ dataUrl: data.dataUrl, caption });
+  });
+
+  const formattedDate = date ? new Date(date + 'T12:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
+  const formattedNext = nextDate ? new Date(nextDate + 'T12:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
+
+  const findingsHTML = findings.length ? findings.map((f, i) => `
+    <div style="background:#1a2e1a;border-left:3px solid #e8b84b;border-radius:0 8px 8px 0;padding:12px 14px;margin-bottom:10px">
+      <div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#e8b84b;font-weight:600;margin-bottom:4px">Issue ${i + 1}</div>
+      <div style="font-size:15px;line-height:1.6;color:#f5f0e8">${f}</div>
+    </div>
+  `).join('') : '';
+
+  const videosHTML = videos.map(v => `
+    <div style="margin-bottom:16px">
+      <video src="${v.dataUrl}" controls playsinline style="width:100%;border-radius:10px;max-height:300px;background:#000"></video>
+      ${v.caption ? `<div style="font-size:13px;color:#c8a47a;margin-top:6px">▶ ${v.caption}</div>` : ''}
+    </div>
+  `).join('');
+
+  const imagesHTML = images.map(i => `
+    <div style="margin-bottom:16px">
+      <img src="${i.dataUrl}" style="width:100%;border-radius:10px;max-height:300px;object-fit:cover" alt="frame">
+      ${i.caption ? `<div style="font-size:13px;color:#c8a47a;margin-top:6px">📸 ${i.caption}</div>` : ''}
+    </div>
+  `).join('');
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${player} — Coaching Report</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  body { font-family:'DM Sans',sans-serif; background:#0f1a0f; color:#f5f0e8; margin:0; padding:0; }
+  .hero { background:#1a3a1a; border-bottom:3px solid #e8b84b; padding:28px 20px 20px; }
+  .hero h1 { font-family:'Bebas Neue',sans-serif; font-size:36px; letter-spacing:2px; color:#e8b84b; margin:0 0 4px; }
+  .meta { font-size:12px; color:#c8a47a; letter-spacing:1px; text-transform:uppercase; }
+  .badge { display:inline-block; background:#2d5a27; color:#e8b84b; font-size:11px; font-weight:600; letter-spacing:1px; text-transform:uppercase; padding:3px 10px; border-radius:20px; margin-top:8px; }
+  .content { padding:20px 16px; max-width:600px; margin:0 auto; }
+  .section { margin-bottom:28px; }
+  .section-title { font-family:'Bebas Neue',sans-serif; font-size:16px; letter-spacing:2px; color:#e8b84b; text-transform:uppercase; border-bottom:1px solid #2d4a2d; padding-bottom:6px; margin-bottom:14px; }
+  .text-block { font-size:15px; line-height:1.7; color:#f5f0e8; background:#1e2e1e; border-radius:10px; padding:14px; }
+  .next-box { background:#1e2e1e; border:1px solid #2d4a2d; border-radius:10px; padding:14px; display:flex; gap:20px; flex-wrap:wrap; }
+  .next-item label { font-size:11px; color:#c8a47a; letter-spacing:1px; text-transform:uppercase; display:block; margin-bottom:3px; }
+  .next-item span { font-size:15px; font-weight:500; }
+  footer { text-align:center; font-size:11px; color:#2d4a2d; padding:30px 20px; letter-spacing:1px; }
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="meta">⚾ Coaching Report</div>
+  <h1>${player}</h1>
+  <div class="meta">${formattedDate}</div>
+  <div class="badge">${focus}</div>
+</div>
+<div class="content">
+  ${overview ? `<div class="section"><div class="section-title">Session Overview</div><div class="text-block">${overview.replace(/\n/g,'<br>')}</div></div>` : ''}
+  ${findingsHTML ? `<div class="section"><div class="section-title">Issues to Address</div>${findingsHTML}</div>` : ''}
+  ${videosHTML ? `<div class="section"><div class="section-title">Video Clips</div>${videosHTML}</div>` : ''}
+  ${imagesHTML ? `<div class="section"><div class="section-title">Still Frames</div>${imagesHTML}</div>` : ''}
+  ${homework ? `<div class="section"><div class="section-title">Homework & Drills</div><div class="text-block">${homework.replace(/\n/g,'<br>')}</div></div>` : ''}
+  ${(formattedNext || nextFocus) ? `<div class="section"><div class="section-title">Next Session</div><div class="next-box">${formattedNext ? `<div class="next-item"><label>Date</label><span>${formattedNext}</span></div>` : ''}${nextFocus ? `<div class="next-item"><label>Focus</label><span>${nextFocus}</span></div>` : ''}</div></div>` : ''}
+</div>
+<footer>COACH${coach ? ': ' + coach.toUpperCase() : ''} · ${formattedDate}</footer>
+</body>
+</html>`;
+
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const safeName = player.replace(/\s+/g, '-').toLowerCase();
+  const safeDate = date || 'report';
+  a.download = `${safeName}-coaching-report-${safeDate}.html`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Report exported! Upload to Google Drive.');
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+</script>
+</body>
+</html>
