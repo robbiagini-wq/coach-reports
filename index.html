@@ -20,7 +20,7 @@
   label{display:block;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--dirt);margin-bottom:6px;}
   input[type="text"],input[type="date"],input[type="url"],select,textarea{width:100%;background:var(--pine);border:1px solid var(--border);border-radius:8px;color:var(--chalk);font-family:'DM Sans',sans-serif;font-size:15px;padding:10px 12px;outline:none;transition:border-color 0.2s;-webkit-appearance:none;appearance:none;}
   input:focus,select:focus,textarea:focus{border-color:var(--accent);}
-  textarea{resize:vertical;min-height:80px;line-height:1.5;}
+  textarea{resize:vertical;min-height:90px;line-height:1.5;overflow:hidden;}
   .field{margin-bottom:14px;}
   .field:last-child{margin-bottom:0;}
   .row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
@@ -48,7 +48,7 @@
   .mini-btn{flex:1;background:var(--card);border:1px solid var(--border);border-radius:6px;color:var(--chalk);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;padding:7px;cursor:pointer;}
   .mini-btn.danger{border-color:var(--red);color:var(--red);}
   .caption-field{margin-top:10px;}
-  .caption-field input{font-size:13px;padding:8px 10px;}
+  .caption-field textarea{font-size:13px;padding:8px 10px;min-height:38px;line-height:1.4;}
   .add-media-btn{width:100%;background:none;border:1.5px dashed var(--border);border-radius:10px;color:var(--dirt);font-family:'DM Sans',sans-serif;font-size:14px;padding:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;margin-top:12px;}
   .findings-list{display:flex;flex-direction:column;gap:10px;}
   .finding-item{background:var(--pine);border-radius:8px;padding:12px;display:flex;gap:10px;align-items:flex-start;}
@@ -233,7 +233,7 @@ function addVideoSlot(prefill){
       <input type="url" id="${id}_ytUrl" placeholder="Paste YouTube link..." oninput="handleYouTube('${id}')">
     </div>
     <div id="${id}_preview"></div>
-    <div class="caption-field"><input type="text" id="caption_${id}" placeholder="Caption for this clip..."></div>
+    <div class="caption-field"><textarea id="caption_${id}" rows="1" placeholder="Caption for this clip..."></textarea></div>
   `;
   document.getElementById('videoSlots').appendChild(slot);
 
@@ -315,7 +315,7 @@ function addImageSlot(prefill){
     <input type="file" id="file_${id}" accept="image/*" onchange="handleImage('${id}',this)">
     <button class="upload-btn" onclick="document.getElementById('file_${id}').click()">📸 Choose Image from Device</button>
     <div id="${id}_preview"></div>
-    <div class="caption-field"><input type="text" id="caption_${id}" placeholder="Caption for this frame..."></div>
+    <div class="caption-field"><textarea id="caption_${id}" rows="1" placeholder="Caption for this frame..."></textarea></div>
   `;
   document.getElementById('imageSlots').appendChild(slot);
   if(prefill){
@@ -402,6 +402,7 @@ async function loadDraft(key){
   (d.videos||[]).forEach(v=>addVideoSlot(v));
   (d.images||[]).forEach(im=>addImageSlot(im));
   if(d.findings&&d.findings.length)d.findings.forEach(f=>addFinding(f));else addFinding();
+  growAll();
   window.scrollTo(0,0);
   showToast('Loaded session for '+d.playerName+' — videos included!');
 }
@@ -488,6 +489,12 @@ function exportReport(){
   showToast('Report exported!');
 }
 function showToast(msg,isError){const t=document.getElementById('toast');t.textContent=msg;t.className='toast'+(isError?' error':'');t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3500);}
+
+// ───────── auto-grow textareas ─────────
+function autoGrow(el){ el.style.height='auto'; el.style.height=(el.scrollHeight+2)+'px'; }
+document.addEventListener('input',function(e){ if(e.target.tagName==='TEXTAREA') autoGrow(e.target); });
+// also grow any textarea that gets populated programmatically (e.g. loading a draft)
+function growAll(){ document.querySelectorAll('textarea').forEach(autoGrow); }
 
 // ───────── init ─────────
 (async function(){
