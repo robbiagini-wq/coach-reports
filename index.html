@@ -292,6 +292,7 @@ function startNewReport(){ // from player list
   setHeader('New Report');
   show('viewBuilder');
   growAll();
+  setTimeout(growAll,60);
 }
 function newReportForCurrentPlayer(){ // from a folder
   blankBuilder();
@@ -299,6 +300,7 @@ function newReportForCurrentPlayer(){ // from a folder
   setHeader('New Report — '+currentPlayer);
   show('viewBuilder');
   growAll();
+  setTimeout(growAll,60);
 }
 function cancelBuilder(){
   if(currentPlayer) openFolder(currentPlayer); else showPlayers();
@@ -322,9 +324,11 @@ async function openReport(id){
   (r.videos||[]).forEach(v=>addVideoSlot(v));
   (r.images||[]).forEach(im=>addImageSlot(im));
   if(r.findings&&r.findings.length)r.findings.forEach(f=>addFinding(f));else addFinding();
-  growAll();
   setHeader('Editing — '+r.playerName);
   show('viewBuilder');
+  growAll();
+  setTimeout(growAll,60);
+  setTimeout(growAll,250);
 }
 
 async function deleteReport(id){
